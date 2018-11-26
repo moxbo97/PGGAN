@@ -1,5 +1,5 @@
 import tensorflow as tf
-from ops import lrelu, conv2d, fully_connect, upscale, Pixl_Norm, downscale2d, MinibatchstateConcat
+from ops import lrelu, conv2d, fully_connect, upscale, Pixl_Norm, downscale2d, MinibatchstateConcat, batch_normal
 from utils import save_images
 import numpy as np
 from scipy.ndimage.interpolation import zoom
@@ -287,42 +287,58 @@ class PGGAN(object):
 
 
 #################################################decode####################################
-
-
+     ##decode V1
+    #
+    # def decode(self, conv, pg=1, t=False, alpha_trans=0.01):
+    #     with tf.variable_scope("decode") as scope:
+    #         if t:
+    #             conv_iden = downscale2d(conv)
+    #             # from RGB
+    #             conv_iden = lrelu(conv2d(conv_iden, output_dim=self.get_nf(pg - 2), k_w=1, k_h=1, d_h=1, d_w=1,
+    #                                      use_wscale=self.use_wscale,
+    #                                      name='de_y_rgb_conv_{}'.format(conv_iden.shape[1])))
+    #         # fromRGB
+    #         conv = lrelu(
+    #             conv2d(conv, output_dim=self.get_nf(pg - 1), k_w=1, k_h=1, d_w=1, d_h=1, use_wscale=self.use_wscale,
+    #                    name='de_y_rgb_conv_{}'.format(conv.shape[1])))
+    #
+    #         for i in range(pg - 1):
+    #             conv = lrelu(conv2d(conv, output_dim=self.get_nf(pg - 1 - i), d_h=1, d_w=1, use_wscale=self.use_wscale,
+    #                                 name='de_n_conv_1_{}'.format(conv.shape[1])))
+    #             conv = lrelu(conv2d(conv, output_dim=self.get_nf(pg - 2 - i), d_h=1, d_w=1, use_wscale=self.use_wscale,
+    #                                 name='de_n_conv_2_{}'.format(conv.shape[1])))
+    #             conv = downscale2d(conv)
+    #             if i == 0 and t:
+    #                 conv = alpha_trans * conv + (1 - alpha_trans) * conv_iden
+    #
+    #         conv = MinibatchstateConcat(conv)
+    #         conv = lrelu(
+    #             conv2d(conv, output_dim=self.get_nf(1), k_w=3, k_h=3, d_h=1, d_w=1, use_wscale=self.use_wscale,
+    #                    name='de_n_conv_1_{}'.format(conv.shape[1])))
+    #         conv = lrelu(
+    #             conv2d(conv, output_dim=self.get_nf(1), k_w=4, k_h=4, d_h=1, d_w=1, use_wscale=self.use_wscale,
+    #                    padding='VALID', name='de_n_conv_2_{}'.format(conv.shape[1])))
+    #         conv = tf.reshape(conv, [self.batch_size, -1])
+    #
+    #         # for D
+    #         output = fully_connect(conv, output_size=self.sample_size, use_wscale=self.use_wscale, gain=1, name='de_n_fully')
+    #         return tf.nn.sigmoid(output), output
+    #
+      ##decode V2
     def decode(self, conv, pg=1, t=False, alpha_trans=0.01):
-        if t:
-            conv_iden = downscale2d(conv)
-            # from RGB
-            conv_iden = lrelu(conv2d(conv_iden, output_dim=self.get_nf(pg - 2), k_w=1, k_h=1, d_h=1, d_w=1,
-                                     use_wscale=self.use_wscale,
-                                     name='de_y_rgb_conv_{}'.format(conv_iden.shape[1])))
-        # fromRGB
-        conv = lrelu(
-            conv2d(conv, output_dim=self.get_nf(pg - 1), k_w=1, k_h=1, d_w=1, d_h=1, use_wscale=self.use_wscale,
-                   name='de_y_rgb_conv_{}'.format(conv.shape[1])))
+        with tf.variable_scope("decode") as scope:
+            df_dim = 64
+            h0 = lrelu(conv2d(conv, df_dim, k_h=5, k_w=5, use_wscale=self.use_wscale, name='de_h0_conv'))
+            h2 = lrelu(batch_normal(conv2d(h0, df_dim * 2, k_h=5, k_w=5, use_wscale=self.use_wscale, name='de_h2_conv')))
+            h3 = lrelu(batch_normal(conv2d(h2, df_dim * 2, k_h=5, k_w=5, use_wscale=self.use_wscale, name='de_h3_conv')))
+            h4 = lrelu(batch_normal(conv2d(h3, df_dim * 4, k_h=5, k_w=5, use_wscale=self.use_wscale, name='de_h4_conv')))
+            h5 = lrelu(batch_normal(conv2d(h4, df_dim * 4, k_h=5, k_w=5, use_wscale=self.use_wscale, name='de_h5_conv')))
+            h7 = lrelu(batch_normal(conv2d(h5, df_dim * 8, k_h=5, k_w=5, use_wscale=self.use_wscale,  name='de_h7_conv')))
+            h8 = fully_connect(tf.reshape(h7, [self.batch_size, -1]), output_size=self.sample_size, use_wscale=self.use_wscale, gain=1, name='de_h8_lin')
 
-        for i in range(pg - 1):
-            conv = lrelu(conv2d(conv, output_dim=self.get_nf(pg - 1 - i), d_h=1, d_w=1, use_wscale=self.use_wscale,
-                                name='de_n_conv_1_{}'.format(conv.shape[1])))
-            conv = lrelu(conv2d(conv, output_dim=self.get_nf(pg - 2 - i), d_h=1, d_w=1, use_wscale=self.use_wscale,
-                                name='de_n_conv_2_{}'.format(conv.shape[1])))
-            conv = downscale2d(conv)
-            if i == 0 and t:
-                conv = alpha_trans * conv + (1 - alpha_trans) * conv_iden
+            # h4 = tf.nn.softplus(h4,'s_relu')
 
-        conv = MinibatchstateConcat(conv)
-        conv = lrelu(
-            conv2d(conv, output_dim=self.get_nf(1), k_w=3, k_h=3, d_h=1, d_w=1, use_wscale=self.use_wscale,
-                   name='de_n_conv_1_{}'.format(conv.shape[1])))
-        conv = lrelu(
-            conv2d(conv, output_dim=self.get_nf(1), k_w=4, k_h=4, d_h=1, d_w=1, use_wscale=self.use_wscale,
-                   padding='VALID', name='de_n_conv_2_{}'.format(conv.shape[1])))
-        conv = tf.reshape(conv, [self.batch_size, -1])
-
-        # for D
-        output = fully_connect(conv, output_size=self.sample_size, use_wscale=self.use_wscale, gain=1, name='de_n_fully')
-        return tf.nn.sigmoid(output), output
-
+            return h8
 
 ############################################################################################
     def generate(self, z_var, pg=1, t=False, alpha_trans=0.0):
