@@ -163,7 +163,7 @@ class PGGAN(object):
         opti_D = tf.train.AdamOptimizer(learning_rate=self.learning_rate, beta1=0.0, beta2=0.99).minimize(
             self.D_loss, var_list=self.d_vars)
         opti_De = tf.train.AdamOptimizer(learning_rate=self.learning_rate, beta1=0.0, beta2=0.99).minimize(
-                self.De_loss, var_list=self.de_vars)
+            self.De_loss, var_list=self.de_vars)
         opti_G = tf.train.AdamOptimizer(learning_rate=self.learning_rate, beta1=0.0, beta2=0.99).minimize(
             self.G_loss, var_list=self.g_vars)
         tmp = tf.cast(self.De_res>0,dtype=tf.float32)
@@ -286,8 +286,8 @@ class PGGAN(object):
             return tf.nn.sigmoid(output), output
 
 
-#################################################decode####################################
-     ##decode V1
+    #################################################decode####################################
+    ##decode V1
     #
     # def decode(self, conv, pg=1, t=False, alpha_trans=0.01):
     #     with tf.variable_scope("decode") as scope:
@@ -324,23 +324,23 @@ class PGGAN(object):
     #         output = fully_connect(conv, output_size=self.sample_size, use_wscale=self.use_wscale, gain=1, name='de_n_fully')
     #         return tf.nn.sigmoid(output), output
     #
-      ##decode V2
+    ##decode V2
     def decode(self, conv, pg=1, t=False, alpha_trans=0.01):
         with tf.variable_scope("decode") as scope:
             df_dim = 64
             h0 = lrelu(conv2d(conv, df_dim, k_h=5, k_w=5, use_wscale=self.use_wscale, name='de_h0_conv'))
-            h2 = lrelu(batch_normal(conv2d(h0, df_dim * 2, k_h=5, k_w=5, use_wscale=self.use_wscale, name='de_h2_conv')))
-            h3 = lrelu(batch_normal(conv2d(h2, df_dim * 2, k_h=5, k_w=5, use_wscale=self.use_wscale, name='de_h3_conv')))
-            h4 = lrelu(batch_normal(conv2d(h3, df_dim * 4, k_h=5, k_w=5, use_wscale=self.use_wscale, name='de_h4_conv')))
-            h5 = lrelu(batch_normal(conv2d(h4, df_dim * 4, k_h=5, k_w=5, use_wscale=self.use_wscale, name='de_h5_conv')))
-            h7 = lrelu(batch_normal(conv2d(h5, df_dim * 8, k_h=5, k_w=5, use_wscale=self.use_wscale,  name='de_h7_conv')))
+            h2 = lrelu(batch_normal(conv2d(h0, df_dim * 2, k_h=5, k_w=5, use_wscale=self.use_wscale, name='de_h2_conv'),scope="bn"))
+            h3 = lrelu(batch_normal(conv2d(h2, df_dim * 2, k_h=5, k_w=5, use_wscale=self.use_wscale, name='de_h3_conv'),scope="bn"))
+            h4 = lrelu(batch_normal(conv2d(h3, df_dim * 4, k_h=5, k_w=5, use_wscale=self.use_wscale, name='de_h4_conv'),scope="bn"))
+            h5 = lrelu(batch_normal(conv2d(h4, df_dim * 4, k_h=5, k_w=5, use_wscale=self.use_wscale, name='de_h5_conv'), scope="bn"))
+            h7 = lrelu(batch_normal(conv2d(h5, df_dim * 8, k_h=5, k_w=5, use_wscale=self.use_wscale, name='de_h7_conv'), scope="bn"))
             h8 = fully_connect(tf.reshape(h7, [self.batch_size, -1]), output_size=self.sample_size, use_wscale=self.use_wscale, gain=1, name='de_h8_lin')
 
             # h4 = tf.nn.softplus(h4,'s_relu')
 
             return h8
 
-############################################################################################
+    ############################################################################################
     def generate(self, z_var, pg=1, t=False, alpha_trans=0.0):
         with tf.variable_scope('generator') as scope:
 
